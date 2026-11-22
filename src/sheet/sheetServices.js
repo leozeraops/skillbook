@@ -49,7 +49,7 @@ function writePublicationAudit(preview, response) {
     new Date(),
     Session.getActiveUser().getEmail(),
     getSalesforceEnvironment(),
-    preview.insertions.length + preview.updates.length,
+    preview.selectedRowCount || preview.insertions.length + preview.updates.length,
     successes,
     failures,
     JSON.stringify({

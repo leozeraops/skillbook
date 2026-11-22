@@ -164,6 +164,7 @@ export function normalizePublication({ selectedRows = [], salesforceRows = [] })
     serviceResourceId: row.ServiceResourceId || row.serviceResourceId,
     skillId: row.SkillId || row.skillId,
     effectiveStartDate: normalizeDate(row.EffectiveStartDate || row.effectiveStartDate),
+    effectiveEndDate: normalizeDate(row.EffectiveEndDate || row.effectiveEndDate),
   }));
 
   for (const insertion of insertions) {
@@ -174,6 +175,19 @@ export function normalizePublication({ selectedRows = [], salesforceRows = [] })
     );
     if (exists) {
       addError(errors, insertion, "EXACT_DUPLICATE", "The vigency already exists in Salesforce.");
+    }
+  }
+
+  for (const insertion of insertions) {
+    const overlaps = sfIdentityRows.some((row) =>
+      row.serviceResourceId === insertion.serviceResourceId
+      && row.skillId === insertion.skillId
+      && row.effectiveStartDate
+      && row.effectiveStartDate <= (insertion.effectiveEndDate || "9999-12-31")
+      && insertion.effectiveStartDate <= (row.effectiveEndDate || "9999-12-31")
+    );
+    if (overlaps) {
+      addError(errors, insertion, "VIGENCY_OVERLAP", "The vigency overlaps a Salesforce assignment.");
     }
   }
 

@@ -31,7 +31,24 @@ function readSelectedRows(ranges) {
 function buildPublicationPreview(ranges) {
   const selectedRows = readSelectedRows(ranges);
   const salesforceRows = readLoadedSalesforceRows();
-  return normalizePublicationForAppsScript(selectedRows, salesforceRows);
+  const result = normalizePublicationForAppsScript(selectedRows, salesforceRows);
+  let mappingValid = true;
+  try {
+    const mapping = getFieldMapping();
+    const requiredHeaders = [
+      "ID Colaborador",
+      "ID Habilidade Recurso",
+      "ID Habilidade",
+      "Nível Habilidade",
+      "Data Início",
+    ];
+    mappingValid = requiredHeaders.every((header) => Boolean(mapping[header] && mapping[header].apiName));
+  } catch (error) {
+    mappingValid = false;
+  }
+  result.mappingValid = mappingValid;
+  result.selectedRowCount = selectedRows.length;
+  return result;
 }
 
 function formatPublicationResult(response) {

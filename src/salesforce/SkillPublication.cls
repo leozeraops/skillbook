@@ -43,6 +43,8 @@ global with sharing class SkillPublication {
             List<String> validationErrors = validateRecord(record);
             if (!validationErrors.isEmpty()) {
                 response.records.add(new RecordResult(record.rowNumber == null ? 0 : record.rowNumber, false, null, validationErrors));
+            } else if (rejectVigencyConflict(record, null)) {
+                response.records.add(new RecordResult(record.rowNumber == null ? 0 : record.rowNumber, false, null, new List<String>{ 'VIGENCY_OVERLAP' }));
             } else {
                 inserts.add(toSObject(record));
                 insertRows.add(record.rowNumber == null ? 0 : record.rowNumber);
@@ -65,6 +67,8 @@ global with sharing class SkillPublication {
             List<String> validationErrors = validateRecord(record);
             if (!validationErrors.isEmpty()) {
                 response.records.add(new RecordResult(record.rowNumber == null ? 0 : record.rowNumber, false, null, validationErrors));
+            } else if (rejectVigencyConflict(record, record.id)) {
+                response.records.add(new RecordResult(record.rowNumber == null ? 0 : record.rowNumber, false, null, new List<String>{ 'VIGENCY_OVERLAP' }));
             } else {
                 updates.add(toSObject(record));
                 updateRows.add(record.rowNumber == null ? 0 : record.rowNumber);
@@ -82,6 +86,28 @@ global with sharing class SkillPublication {
         }
 
         return response;
+    }
+
+    private static Boolean rejectVigencyConflict(SkillRecord record, String excludedId) {
+        if (record.serviceResourceId == null || record.skillId == null || record.effectiveStartDate == null) {
+            return false;
+        }
+
+        String soql = 'SELECT Id, EffectiveStartDate, EffectiveEndDate FROM ServiceResourceSkill'
+            + ' WHERE ServiceResourceId = :resourceId AND SkillId = :skillId';
+        Id resourceId = record.serviceResourceId;
+        Id skillId = record.skillId;
+        for (ServiceResourceSkill existing : Database.query(soql)) {
+            if (excludedId != null && existing.Id == excludedId) {
+                continue;
+            }
+            Date existingEnd = existing.EffectiveEndDate == null ? Date.newInstance(9999, 12, 31) : existing.EffectiveEndDate;
+            Date recordEnd = record.effectiveEndDate == null ? Date.newInstance(9999, 12, 31) : record.effectiveEndDate;
+            if (existing.EffectiveStartDate <= recordEnd && record.effectiveStartDate <= existingEnd) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ServiceResourceSkill toSObject(SkillRecord record) {

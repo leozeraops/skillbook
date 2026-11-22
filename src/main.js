@@ -36,8 +36,8 @@ function publishSelectedRows() {
   if (!preview) {
     return null;
   }
-  if (preview.errors.length > 0) {
-    SpreadsheetApp.getUi().alert("Corrija os erros antes de confirmar a publicação.");
+  if (!preview.mappingValid) {
+    SpreadsheetApp.getUi().alert("A publicação foi interrompida: mapeamento obrigatório ausente ou inválido.");
     return null;
   }
 

@@ -173,3 +173,28 @@ test("resume uma resposta parcial sem perder linhas aprovadas ou falhadas", () =
     failedRows: [{ rowNumber: 4, errors: ["VALIDATION_ERROR"] }],
   });
 });
+
+test("rejeita sobreposição contra uma vigência já carregada do Salesforce", () => {
+  const result = normalizePublication({
+    selectedRows: [
+      {
+        rowNumber: 15,
+        serviceResourceId: "R1",
+        skillId: "K1",
+        skillLevel: "2",
+        effectiveStartDate: "2027-02-01",
+        effectiveEndDate: "",
+      },
+    ],
+    salesforceRows: [
+      {
+        ServiceResourceId: "R1",
+        SkillId: "K1",
+        EffectiveStartDate: "2027-01-01",
+        EffectiveEndDate: "2027-03-31",
+      },
+    ],
+  });
+
+  assert.equal(result.errors.some((error) => error.code === "VIGENCY_OVERLAP"), true);
+});
