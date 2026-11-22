@@ -18,21 +18,26 @@ function onOpen() {
 }
 
 function previewPublication() {
-  const selection = SpreadsheetApp.getActiveSheet().getSelection();
-  const ranges = selection ? selection.getActiveRangeList().getRanges() : [];
-  if (ranges.length === 0) {
-    SpreadsheetApp.getUi().alert("Selecione uma ou mais linhas da matriz.");
+  try {
+    const selection = SpreadsheetApp.getActiveSheet().getSelection();
+    const ranges = selection ? selection.getActiveRangeList().getRanges() : [];
+    if (ranges.length === 0) {
+      SpreadsheetApp.getUi().alert("Selecione uma ou mais linhas da matriz.");
+      return null;
+    }
+
+    const result = buildPublicationPreview(ranges);
+    const message = [
+      `Inserções: ${result.insertions.length}`,
+      `Atualizações: ${result.updates.length}`,
+      `Erros: ${result.errors.length}`,
+    ].join("\n");
+    SpreadsheetApp.getUi().alert(message);
+    return result;
+  } catch (error) {
+    SpreadsheetApp.getUi().alert("Falha no Salesforce: " + (error.message || "Falha desconhecida"));
     return null;
   }
-
-  const result = buildPublicationPreview(ranges);
-  const message = [
-    `Inserções: ${result.insertions.length}`,
-    `Atualizações: ${result.updates.length}`,
-    `Erros: ${result.errors.length}`,
-  ].join("\n");
-  SpreadsheetApp.getUi().alert(message);
-  return result;
 }
 
 function publishSelectedRows() {
@@ -54,8 +59,13 @@ function publishSelectedRows() {
     return null;
   }
 
-  const response = postPublication(preview);
-  writePublicationAudit(preview, response);
-  SpreadsheetApp.getUi().alert(formatPublicationResult(response));
-  return response;
+  try {
+    const response = postPublication(preview);
+    writePublicationAudit(preview, response);
+    SpreadsheetApp.getUi().alert(formatPublicationResult(response));
+    return response;
+  } catch (error) {
+    SpreadsheetApp.getUi().alert("Falha no Salesforce: " + (error.message || "Falha desconhecida"));
+    return null;
+  }
 }

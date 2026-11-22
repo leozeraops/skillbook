@@ -75,6 +75,7 @@ function refreshSalesforceToken() {
     });
     if (response.getResponseCode() >= 300) return false;
     const token = JSON.parse(response.getContentText());
+    if (!token.access_token) return false;
     properties.setProperty("SALESFORCE_ACCESS_TOKEN", token.access_token);
     if (token.instance_url) properties.setProperty("SALESFORCE_INSTANCE_URL", token.instance_url);
     return true;
@@ -119,6 +120,9 @@ function authCallback(request) {
     }
 
     const token = JSON.parse(response.getContentText());
+    if (!token.access_token || !token.instance_url) {
+      return HtmlService.createHtmlOutput("Falha na troca do código OAuth.");
+    }
     const properties = PropertiesService.getUserProperties();
     properties.setProperty("SALESFORCE_ACCESS_TOKEN", token.access_token);
     properties.setProperty("SALESFORCE_REFRESH_TOKEN", token.refresh_token || "");
@@ -135,10 +139,19 @@ function doGet(request) {
 }
 
 function setSalesforceEnvironment(environment) {
-  PropertiesService.getUserProperties().setProperty(
+  const properties = PropertiesService.getUserProperties();
+  properties.setProperty(
     "SALESFORCE_ENVIRONMENT",
     environment === "sandbox" ? "sandbox" : "production",
   );
+  properties.deleteProperty("SALESFORCE_ACCESS_TOKEN");
+  properties.deleteProperty("SALESFORCE_REFRESH_TOKEN");
+  properties.deleteProperty("SALESFORCE_INSTANCE_URL");
+  properties.deleteProperty("SALESFORCE_PKCE_VERIFIER");
+  CacheService.getUserCache().removeAll([
+    "SALESFORCE_SESSION_VALID",
+    "SALESFORCE_SYNC_LOCK",
+  ]);
   const ui = SpreadsheetApp.getUi();
   ui.alert(environment === "sandbox"
     ? "Ambiente Salesforce: Sandbox."
