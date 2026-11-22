@@ -6,13 +6,43 @@ function replaceDataRange(sheetName, values) {
   }
   if (values.length === 0) return;
 
-  const headerRange = sheet.getRange(1, 1, 1, sheet.getMaxColumns());
-  if (sheet.getLastRow() > 1) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getMaxColumns()).clearContent();
+  const existingValues = sheet.getLastRow() > 0
+    ? sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues()
+    : [];
+  const dataHeaders = values[0];
+  let nextColumn = sheet.getLastColumn() + 1;
+  const mappedIndexes = dataHeaders.map((header) => {
+    const index = existingValues[0]
+      ? existingValues[0].findIndex((existing) => String(existing).trim() === String(header).trim())
+      : -1;
+    if (index >= 0) return index + 1;
+    const column = nextColumn;
+    nextColumn += 1;
+    return column;
+  });
+
+  for (let index = 0; index < dataHeaders.length; index += 1) {
+    const column = mappedIndexes[index];
+    sheet.getRange(1, column, 1, 1).setValue(dataHeaders[index]);
   }
-  headerRange.clearContent();
-  sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
-  sheet.createFilter();
+
+  const lastDataRow = sheet.getLastRow();
+  if (lastDataRow > 1) {
+    for (const column of mappedIndexes) {
+      sheet.getRange(2, column, lastDataRow - 1, 1).clearContent();
+    }
+  }
+
+  for (let index = 0; index < dataHeaders.length; index += 1) {
+    const column = mappedIndexes[index];
+    const columnValues = values.slice(1).map((row) => [row[index]]);
+    if (columnValues.length > 0) {
+      sheet.getRange(2, column, columnValues.length, 1).setValues(columnValues);
+    }
+  }
+  if (!sheet.getFilter()) {
+    sheet.createFilter();
+  }
 }
 
 function getFieldMapping() {

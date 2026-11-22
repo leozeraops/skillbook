@@ -56,26 +56,44 @@ function querySalesforceAll(soql) {
   return records;
 }
 
+function getMappedColumns(objectNames) {
+  const mapping = getFieldMapping();
+  return Object.keys(mapping)
+    .filter((header) => objectNames.indexOf(mapping[header].objectName) >= 0)
+    .map((header) => ({
+      header,
+      objectName: mapping[header].objectName,
+      apiName: mapping[header].apiName,
+    }));
+}
+
+function readMappedValue(record, apiName) {
+  if (!apiName) return "";
+  if (apiName.indexOf(".") >= 0) {
+    const parts = apiName.split(".");
+    let value = record;
+    for (const part of parts) {
+      if (value === null || value === undefined) return "";
+      value = value[part];
+    }
+    return value === null || value === undefined ? "" : value;
+  }
+  return record[apiName] === null || record[apiName] === undefined ? "" : record[apiName];
+}
+
 function syncColaboradores() {
   try {
+    const columns = getMappedColumns(["ServiceResource"]);
+    if (columns.length === 0) {
+      throw new Error("Não há colunas de ServiceResource no mapeamento.");
+    }
+    const apiNames = Array.from(new Set(columns.map((column) => column.apiName)));
     const rows = querySalesforceAll(
-      "SELECT Id, Name, IsActive, IsOptimizationCapable, Departamento__c, Supervis_o__c, " +
-      "Coordena_o__c, LocationId, ResourceType, ID_Prestador_Friday__c, Matricula_Turbi__c " +
-      "FROM ServiceResource ORDER BY Name",
+      `SELECT ${apiNames.join(", ")} FROM ServiceResource ORDER BY Name`,
     );
     replaceDataRange("Colaboradores", [
-      ["ID Colaborador", "Colaborador", "Ativo", "Inserido na Otimização", "Departamento", "Supervisão", "Coordenação", "Local", "Tipo"],
-      ...rows.map((row) => [
-        row.Id,
-        row.Name,
-        row.IsActive,
-        row.IsOptimizationCapable,
-        row.Departamento__c,
-        row.Supervis_o__c,
-        row.Coordena_o__c,
-        row.LocationId,
-        row.ResourceType,
-      ]),
+      columns.map((column) => column.header),
+      ...rows.map((row) => columns.map((column) => readMappedValue(row, column.apiName))),
     ]);
     return rows;
   } catch (error) {
@@ -86,22 +104,31 @@ function syncColaboradores() {
 
 function syncSkills() {
   try {
+    const columns = getMappedColumns(["ServiceResourceSkill", "Skill", "ServiceResource"]);
+    if (columns.length === 0) {
+      throw new Error("Não há colunas de habilidades no mapeamento.");
+    }
+    const apiNames = Array.from(new Set(columns.map((column) => {
+      if (column.apiName && column.apiName.indexOf(".") >= 0) return column.apiName;
+      if (column.objectName === "ServiceResource" || column.objectName === "Skill") {
+        return `${column.objectName}.${column.apiName}`;
+      }
+      return column.apiName;
+    }).filter((apiName) => apiName)));
     const rows = querySalesforceAll(
-      "SELECT Id, ServiceResourceId, SkillId, Skill.MasterLabel, SkillLevel, " +
-      "EffectiveStartDate, EffectiveEndDate, CreatedById, LastModifiedById " +
-      "FROM ServiceResourceSkill",
+      `SELECT ${apiNames.join(", ")} FROM ServiceResourceSkill`,
     );
     replaceDataRange("Matriz de Habilidades", [
-      ["ID Habilidade Recurso", "ID Colaborador", "ID Habilidade", "Habilidade", "Nível Habilidade", "Data Início", "Data Término"],
-      ...rows.map((row) => [
-        row.Id,
-        row.ServiceResourceId,
-        row.SkillId,
-        row.Skill ? row.Skill.MasterLabel : "",
-        row.SkillLevel,
-        row.EffectiveStartDate,
-        row.EffectiveEndDate,
-      ]),
+      columns.map((column) => column.header),
+      ...rows.map((row) => columns.map((column) => {
+        if (column.apiName && column.apiName.indexOf(".") >= 0) {
+          return readMappedValue(row, column.apiName);
+        }
+        if (column.objectName === "ServiceResource" || column.objectName === "Skill") {
+          return readMappedValue(row, `${column.objectName}.${column.apiName}`);
+        }
+        return readMappedValue(row, column.apiName);
+      })),
     ]);
     readLoadedSalesforceRowsCache = rows;
     return rows;
@@ -126,13 +153,31 @@ function readLoadedSalesforceRows() {
   }
   const headers = values[0].map((value) => String(value).trim());
   const index = (name) => headers.indexOf(name);
+  let mapping = {};
+  try {
+    mapping = getFieldMapping();
+  } catch (error) {
+    mapping = {};
+  }
+  const headerForApiName = (apiName) => {
+    for (const header of Object.keys(mapping)) {
+      if (mapping[header].apiName === apiName) return header;
+    }
+    return null;
+  };
+  const idHeader = headerForApiName("Id");
+  const resourceHeader = headerForApiName("ServiceResourceId");
+  const skillHeader = headerForApiName("SkillId");
+  const levelHeader = headerForApiName("SkillLevel");
+  const startHeader = headerForApiName("EffectiveStartDate");
+  const endHeader = headerForApiName("EffectiveEndDate");
   return values.slice(1).map((row) => ({
-    Id: row[index("ID Habilidade Recurso")],
-    ServiceResourceId: row[index("ID Colaborador")],
-    SkillId: row[index("ID Habilidade")],
-    SkillLevel: row[index("Nível Habilidade")],
-    EffectiveStartDate: row[index("Data Início")],
-    EffectiveEndDate: row[index("Data Término")],
+    Id: idHeader ? row[index(idHeader)] : "",
+    ServiceResourceId: resourceHeader ? row[index(resourceHeader)] : "",
+    SkillId: skillHeader ? row[index(skillHeader)] : "",
+    SkillLevel: levelHeader ? row[index(levelHeader)] : "",
+    EffectiveStartDate: startHeader ? row[index(startHeader)] : "",
+    EffectiveEndDate: endHeader ? row[index(endHeader)] : "",
   }));
 }
 

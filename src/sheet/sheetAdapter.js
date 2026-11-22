@@ -2,6 +2,26 @@ function readSelectedRows(ranges) {
   const sheet = SpreadsheetApp.getActiveSheet();
   const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const columnIndex = new Map(headerRow.map((header, index) => [String(header).trim(), index]));
+  let mapping = {};
+  try {
+    mapping = getFieldMapping();
+  } catch (error) {
+    mapping = {};
+  }
+  const headerForApiName = (apiName) => {
+    for (const header of Object.keys(mapping)) {
+      if (mapping[header].apiName === apiName) return header;
+    }
+    return null;
+  };
+  const headers = {
+    salesforceId: headerForApiName("Id"),
+    serviceResourceId: headerForApiName("ServiceResourceId"),
+    skillId: headerForApiName("SkillId"),
+    skillLevel: headerForApiName("SkillLevel"),
+    effectiveStartDate: headerForApiName("EffectiveStartDate"),
+    effectiveEndDate: headerForApiName("EffectiveEndDate"),
+  };
   const rows = [];
 
   for (const range of ranges) {
@@ -16,12 +36,12 @@ function readSelectedRows(ranges) {
       };
       rows.push({
         rowNumber: row,
-        salesforceId: get("ID Habilidade Recurso"),
-        serviceResourceId: get("ID Colaborador"),
-        skillId: get("ID Habilidade"),
-        skillLevel: get("Nível Habilidade"),
-        effectiveStartDate: get("Data Início"),
-        effectiveEndDate: get("Data Término"),
+        salesforceId: get(headers.salesforceId),
+        serviceResourceId: get(headers.serviceResourceId),
+        skillId: get(headers.skillId),
+        skillLevel: get(headers.skillLevel),
+        effectiveStartDate: get(headers.effectiveStartDate),
+        effectiveEndDate: get(headers.effectiveEndDate),
       });
     }
   }
@@ -35,14 +55,15 @@ function buildPublicationPreview(ranges) {
   let mappingValid = true;
   try {
     const mapping = getFieldMapping();
-    const requiredHeaders = [
-      "ID Colaborador",
-      "ID Habilidade Recurso",
-      "ID Habilidade",
-      "Nível Habilidade",
-      "Data Início",
+    const requiredApiNames = [
+      "ServiceResourceId",
+      "Id",
+      "SkillId",
+      "SkillLevel",
+      "EffectiveStartDate",
     ];
-    mappingValid = requiredHeaders.every((header) => Boolean(mapping[header] && mapping[header].apiName));
+    const mappedApiNames = Object.keys(mapping).map((header) => mapping[header].apiName);
+    mappingValid = requiredApiNames.every((apiName) => mappedApiNames.includes(apiName));
   } catch (error) {
     mappingValid = false;
   }
