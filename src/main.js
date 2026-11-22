@@ -1,6 +1,8 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu("Salesforce Habilidades")
+    .addItem("Verificar projeto", "checkProjectHealth")
+    .addSeparator()
     .addItem("Sincronizar colaboradores", "syncColaboradores")
     .addItem("Sincronizar habilidades", "syncSkills")
     .addSeparator()

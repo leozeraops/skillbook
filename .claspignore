@@ -1,2 +1,13 @@
 src/publication/normalizePublication.js
+src/projectHealth.js
+.clasp.json
+.clasprc.json
+*.clasprc.json
 test/**
+node_modules/**
+.agents/**
+scripts/**
+package.json
+README.md
+.gitignore
+.clasp.json.example
