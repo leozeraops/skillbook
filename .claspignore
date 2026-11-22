@@ -1,5 +1,6 @@
 src/publication/normalizePublication.js
 src/projectHealth.js
+src/auth/auth.js
 .clasp.json
 .clasprc.json
 *.clasprc.json

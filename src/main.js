@@ -10,6 +10,8 @@ function onOpen() {
     .addItem("Publicar seleção", "publishSelectedRows")
     .addSeparator()
     .addItem("Entrar no Salesforce", "startSalesforceLogin")
+    .addItem("Usar Salesforce Produção", "useSalesforceProduction")
+    .addItem("Usar Salesforce Sandbox", "useSalesforceSandbox")
     .addItem("Sair do Salesforce", "logoutSalesforce")
     .addItem("Verificar ambiente", "checkSalesforceHealth")
     .addToUi();

@@ -22,7 +22,11 @@ function salesforceFetch(path, options) {
   const session = service.validateSession();
   if (!session.valid) {
     clearInvalidSalesforceSession();
-    throw new Error("A sessão do Salesforce expirou. Entre novamente.");
+    const loginUrl = startSalesforceLogin();
+    throw new Error(
+      "A sessão do Salesforce expirou. Entre novamente." +
+      (loginUrl ? " Nova URL: " + loginUrl : ""),
+    );
   }
 
   const baseUrl = PropertiesService.getUserProperties().getProperty("SALESFORCE_INSTANCE_URL");
@@ -53,48 +57,58 @@ function querySalesforceAll(soql) {
 }
 
 function syncColaboradores() {
-  const rows = querySalesforceAll(
-    "SELECT Id, Name, IsActive, IsOptimizationCapable, Departamento__c, Supervis_o__c, " +
-    "Coordena_o__c, LocationId, ResourceType, ID_Prestador_Friday__c, Matricula_Turbi__c " +
-    "FROM ServiceResource ORDER BY Name",
-  );
-  replaceDataRange("Colaboradores", [
-    ["ID Colaborador", "Colaborador", "Ativo", "Inserido na Otimização", "Departamento", "Supervisão", "Coordenação", "Local", "Tipo"],
-    ...rows.map((row) => [
-      row.Id,
-      row.Name,
-      row.IsActive,
-      row.IsOptimizationCapable,
-      row.Departamento__c,
-      row.Supervis_o__c,
-      row.Coordena_o__c,
-      row.LocationId,
-      row.ResourceType,
-    ]),
-  ]);
-  return rows;
+  try {
+    const rows = querySalesforceAll(
+      "SELECT Id, Name, IsActive, IsOptimizationCapable, Departamento__c, Supervis_o__c, " +
+      "Coordena_o__c, LocationId, ResourceType, ID_Prestador_Friday__c, Matricula_Turbi__c " +
+      "FROM ServiceResource ORDER BY Name",
+    );
+    replaceDataRange("Colaboradores", [
+      ["ID Colaborador", "Colaborador", "Ativo", "Inserido na Otimização", "Departamento", "Supervisão", "Coordenação", "Local", "Tipo"],
+      ...rows.map((row) => [
+        row.Id,
+        row.Name,
+        row.IsActive,
+        row.IsOptimizationCapable,
+        row.Departamento__c,
+        row.Supervis_o__c,
+        row.Coordena_o__c,
+        row.LocationId,
+        row.ResourceType,
+      ]),
+    ]);
+    return rows;
+  } catch (error) {
+    SpreadsheetApp.getUi().alert("Falha no Salesforce: " + (error.message || "Falha desconhecida"));
+    return null;
+  }
 }
 
 function syncSkills() {
-  const rows = querySalesforceAll(
-    "SELECT Id, ServiceResourceId, SkillId, Skill.MasterLabel, SkillLevel, " +
-    "EffectiveStartDate, EffectiveEndDate, CreatedById, LastModifiedById " +
-    "FROM ServiceResourceSkill",
-  );
-  replaceDataRange("Matriz de Habilidades", [
-    ["ID Habilidade Recurso", "ID Colaborador", "ID Habilidade", "Habilidade", "Nível Habilidade", "Data Início", "Data Término"],
-    ...rows.map((row) => [
-      row.Id,
-      row.ServiceResourceId,
-      row.SkillId,
-      row.Skill ? row.Skill.MasterLabel : "",
-      row.SkillLevel,
-      row.EffectiveStartDate,
-      row.EffectiveEndDate,
-    ]),
-  ]);
-  readLoadedSalesforceRowsCache = rows;
-  return rows;
+  try {
+    const rows = querySalesforceAll(
+      "SELECT Id, ServiceResourceId, SkillId, Skill.MasterLabel, SkillLevel, " +
+      "EffectiveStartDate, EffectiveEndDate, CreatedById, LastModifiedById " +
+      "FROM ServiceResourceSkill",
+    );
+    replaceDataRange("Matriz de Habilidades", [
+      ["ID Habilidade Recurso", "ID Colaborador", "ID Habilidade", "Habilidade", "Nível Habilidade", "Data Início", "Data Término"],
+      ...rows.map((row) => [
+        row.Id,
+        row.ServiceResourceId,
+        row.SkillId,
+        row.Skill ? row.Skill.MasterLabel : "",
+        row.SkillLevel,
+        row.EffectiveStartDate,
+        row.EffectiveEndDate,
+      ]),
+    ]);
+    readLoadedSalesforceRowsCache = rows;
+    return rows;
+  } catch (error) {
+    SpreadsheetApp.getUi().alert("Falha no Salesforce: " + (error.message || "Falha desconhecida"));
+    return null;
+  }
 }
 
 let readLoadedSalesforceRowsCache = null;
