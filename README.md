@@ -45,9 +45,24 @@ clasp deployments
 
 Use o ID da implantação fixa exibido por `clasp deployments` para executar ou validar o web app. Uma alteração feita por `clasp push` só aparecerá em uma implantação fixa depois que uma nova versão for criada e implantada.
 
+## Cenário ponta a ponta
+
+Executar esta verificação antes de fechar uma entrega:
+
+1. Em Produção, selecione uma unidade e execute `Sincronizar colaboradores` e `Sincronizar habilidades`.
+2. Confirme explicitamente o ambiente usado e execute `Verificar ambiente`.
+3. Edite ou selecione pelo menos uma linha válida, visualize a publicação e confirme o envio.
+4. Verifique no Salesforce que uma inserção ou atualização foi aplicada e confira o registro correspondente em `Publicacoes`.
+5. Repita uma publicação com uma linha válida e uma linha rejeitada para demonstrar o resultado parcial.
+6. Execute a seleção explícita `Usar Salesforce Sandbox`, autentique novamente e repita a verificação de carregamento e publicação no ambiente de testes.
+7. Confirme que a aba `Publicacoes` registra usuário, timestamp, ambiente, contagens e o resumo reduzido.
+
+`clasp push` atualiza o código em `@HEAD`; não cria nem altera uma implantação fixa. Use `clasp version` e `clasp deploy --versionNumber <numero-da-versao>` para criar e apontar uma versão pinada. Valide sempre o ID da implantação mostrada por `clasp deployments`, não um endereço antigo da versão anterior.
+
 ## Testes
 
 ```powershell
 node --test
 npm run check
+npm run verify:release
 ```

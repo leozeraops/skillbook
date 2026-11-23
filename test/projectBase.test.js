@@ -37,3 +37,15 @@ test("development guide documents push, version, pinned deployment and syntax ch
   assert.match(readme, /@HEAD/);
   assert.match(readme, /npm run check/);
 });
+
+test("release verification covers the production and sandbox end-to-end slice", async () => {
+  const readme = await readFile("README.md", "utf8");
+  const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+
+  assert.match(readme, /Cenário ponta a ponta/);
+  assert.match(readme, /Produção/);
+  assert.match(readme, /Sandbox/);
+  assert.match(readme, /resultado parcial/);
+  assert.match(readme, /Publicacoes/);
+  assert.equal(packageJson.scripts["verify:release"], "node scripts/check-project.js && node --test");
+});

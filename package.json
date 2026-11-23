@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "check": "node scripts/check-project.js"
+    "check": "node scripts/check-project.js",
+    "verify:release": "node scripts/check-project.js && node --test"
   }
 }
