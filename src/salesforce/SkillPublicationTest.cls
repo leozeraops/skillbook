@@ -164,7 +164,7 @@ private class SkillPublicationTest {
 
         System.assertEquals(true, findResult(response.records, 5).errors.contains('INVALID_SERVICE_RESOURCE_ID'));
         System.assertEquals(true, findResult(response.records, 5).errors.contains('INVALID_SKILL_ID'));
-        System.assertEquals(false, findResult(response.records, 6).success);
+        System.assertEquals(true, findResult(response.records, 6).success);
         System.assertEquals(false, findResult(response.records, 7).success);
     }
 

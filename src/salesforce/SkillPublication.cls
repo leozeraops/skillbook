@@ -175,13 +175,18 @@ global with sharing class SkillPublication {
         }
 
         Map<Id, ServiceResourceSkill> existingUpdates = new Map<Id, ServiceResourceSkill>();
+        Boolean updateReadAllowed = true;
         if (!updateIds.isEmpty()) {
-            existingUpdates.putAll([
-                SELECT Id, ServiceResourceId, SkillId, SkillLevel, EffectiveStartDate, EffectiveEndDate
-                FROM ServiceResourceSkill
-                WHERE Id IN :updateIds
-                WITH SECURITY_ENFORCED
-            ]);
+            try {
+                existingUpdates.putAll([
+                    SELECT Id, ServiceResourceId, SkillId, SkillLevel, EffectiveStartDate, EffectiveEndDate
+                    FROM ServiceResourceSkill
+                    WHERE Id IN :updateIds
+                    WITH SECURITY_ENFORCED
+                ]);
+            } catch (Exception error) {
+                updateReadAllowed = false;
+            }
         }
 
         Set<Id> handledUpdateIds = new Set<Id>();
@@ -202,6 +207,16 @@ global with sharing class SkillPublication {
                 continue;
             }
             handledUpdateIds.add(recordId);
+            if (!updateReadAllowed) {
+                response.records.add(new RecordResult(
+                    record.rowNumber == null ? 0 : record.rowNumber,
+                    false,
+                    record.id,
+                    new List<String>{ 'AUTHORIZATION_ERROR' },
+                    'FAILED'
+                ));
+                continue;
+            }
             if (!existingUpdates.containsKey(recordId)) {
                 response.records.add(new RecordResult(
                     record.rowNumber == null ? 0 : record.rowNumber,
