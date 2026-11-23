@@ -49,6 +49,7 @@ global with sharing class SkillPublication {
 
         List<ServiceResourceSkill> inserts = new List<ServiceResourceSkill>();
         List<Integer> insertRows = new List<Integer>();
+        List<SkillRecord> acceptedBatch = new List<SkillRecord>();
         List<SkillRecord> insertions = request.insertions == null
             ? new List<SkillRecord>()
             : request.insertions;
@@ -78,9 +79,18 @@ global with sharing class SkillPublication {
                 response.records.add(new RecordResult(record.rowNumber == null ? 0 : record.rowNumber, false, null, validationErrors, 'FAILED'));
             } else if (rejectVigencyConflict(record, null)) {
                 response.records.add(new RecordResult(record.rowNumber == null ? 0 : record.rowNumber, false, null, new List<String>{ 'VIGENCY_OVERLAP' }, 'FAILED'));
+            } else if (batchConflictError(record, acceptedBatch, null) != null) {
+                response.records.add(new RecordResult(
+                    record.rowNumber == null ? 0 : record.rowNumber,
+                    false,
+                    null,
+                    new List<String>{ batchConflictError(record, acceptedBatch, null) },
+                    'FAILED'
+                ));
             } else {
                 inserts.add(toSObject(record));
                 insertRows.add(record.rowNumber == null ? 0 : record.rowNumber);
+                acceptedBatch.add(record);
             }
         }
 
@@ -112,6 +122,7 @@ global with sharing class SkillPublication {
         }
 
         Set<Id> updateIds = new Set<Id>();
+        Set<Id> processedUpdateIds = new Set<Id>();
         for (SkillRecord record : updatesRequest) {
             if (!canUpdate) {
                 continue;
@@ -126,7 +137,31 @@ global with sharing class SkillPublication {
                 response.records.add(new RecordResult(record.rowNumber == null ? 0 : record.rowNumber, false, null, new List<String>{ 'VIGENCY_OVERLAP' }, 'FAILED'));
             } else {
                 try {
-                    updateIds.add((Id) record.id);
+                    Id updateId = (Id) record.id;
+                    if (processedUpdateIds.contains(updateId)) {
+                        response.records.add(new RecordResult(
+                            record.rowNumber == null ? 0 : record.rowNumber,
+                            false,
+                            record.id,
+                            new List<String>{ 'EXACT_DUPLICATE' },
+                            'FAILED'
+                        ));
+                    } else {
+                        String conflict = batchConflictError(record, acceptedBatch, record.id);
+                        if (conflict != null) {
+                            response.records.add(new RecordResult(
+                                record.rowNumber == null ? 0 : record.rowNumber,
+                                false,
+                                record.id,
+                                new List<String>{ conflict },
+                                'FAILED'
+                            ));
+                        } else {
+                            processedUpdateIds.add(updateId);
+                            updateIds.add(updateId);
+                            acceptedBatch.add(record);
+                        }
+                    }
                 } catch (System.StringException error) {
                     response.records.add(new RecordResult(
                         record.rowNumber == null ? 0 : record.rowNumber,
@@ -149,6 +184,7 @@ global with sharing class SkillPublication {
             ]);
         }
 
+        Set<Id> handledUpdateIds = new Set<Id>();
         for (SkillRecord record : updatesRequest) {
             if (!canUpdate || record.id == null) {
                 continue;
@@ -162,6 +198,10 @@ global with sharing class SkillPublication {
             if (!updateIds.contains(recordId)) {
                 continue;
             }
+            if (handledUpdateIds.contains(recordId)) {
+                continue;
+            }
+            handledUpdateIds.add(recordId);
             if (!existingUpdates.containsKey(recordId)) {
                 response.records.add(new RecordResult(
                     record.rowNumber == null ? 0 : record.rowNumber,
@@ -245,6 +285,26 @@ global with sharing class SkillPublication {
         if (record.ServiceResourceId == null || record.SkillId == null) {
             errors.add('MISSING_IDENTITY');
         }
+        if (record.ServiceResourceId != null) {
+            try {
+                Id resourceId = (Id) record.ServiceResourceId;
+                if (resourceId.getSObjectType() != Schema.ServiceResource.SObjectType) {
+                    errors.add('INVALID_SERVICE_RESOURCE_ID');
+                }
+            } catch (System.StringException error) {
+                errors.add('INVALID_SERVICE_RESOURCE_ID');
+            }
+        }
+        if (record.SkillId != null) {
+            try {
+                Id skillId = (Id) record.SkillId;
+                if (skillId.getSObjectType() != Schema.Skill.SObjectType) {
+                    errors.add('INVALID_SKILL_ID');
+                }
+            } catch (System.StringException error) {
+                errors.add('INVALID_SKILL_ID');
+            }
+        }
         if (record.EffectiveStartDate == null) {
             errors.add('START_DATE_REQUIRED');
         }
@@ -257,6 +317,37 @@ global with sharing class SkillPublication {
             errors.add('END_DATE_BEFORE_START');
         }
         return errors;
+    }
+
+    private static String batchConflictError(
+        SkillRecord record,
+        List<SkillRecord> acceptedRecords,
+        String excludedId
+    ) {
+        for (SkillRecord accepted : acceptedRecords) {
+            if (excludedId != null && accepted.id != null && accepted.id == excludedId) {
+                continue;
+            }
+            if (accepted.serviceResourceId != record.serviceResourceId
+                || accepted.skillId != record.skillId) {
+                continue;
+            }
+            if (accepted.effectiveStartDate == record.effectiveStartDate
+                && accepted.effectiveEndDate == record.effectiveEndDate) {
+                return 'EXACT_DUPLICATE';
+            }
+            Date acceptedEnd = accepted.effectiveEndDate == null
+                ? Date.newInstance(9999, 12, 31)
+                : accepted.effectiveEndDate;
+            Date recordEnd = record.effectiveEndDate == null
+                ? Date.newInstance(9999, 12, 31)
+                : record.effectiveEndDate;
+            if (accepted.effectiveStartDate <= recordEnd
+                && record.effectiveStartDate <= acceptedEnd) {
+                return 'VIGENCY_OVERLAP';
+            }
+        }
+        return null;
     }
 
     private static Boolean canCreateRecords() {

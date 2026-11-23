@@ -82,6 +82,93 @@ private class SkillPublicationTest {
     }
 
     @IsTest
+    static void updatesAChangedAssignmentAndReportsUpdated() {
+        Skill skill = new Skill(MasterLabel = 'Changed Skill');
+        insert skill;
+        ServiceResource resource = new ServiceResource(
+            Name = 'Changed Resource',
+            IsActive = true,
+            RelatedRecordId = UserInfo.getUserId()
+        );
+        insert resource;
+        ServiceResourceSkill assignment = new ServiceResourceSkill(
+            ServiceResourceId = resource.Id,
+            SkillId = skill.Id,
+            SkillLevel = 1,
+            EffectiveStartDate = Date.today()
+        );
+        insert assignment;
+
+        SkillPublication.SkillRecord update = new SkillPublication.SkillRecord();
+        update.rowNumber = 4;
+        update.id = assignment.Id;
+        update.serviceResourceId = resource.Id;
+        update.skillId = skill.Id;
+        update.skillLevel = 3;
+        update.effectiveStartDate = Date.today();
+
+        SkillPublication.PublicationRequest request = new SkillPublication.PublicationRequest();
+        request.insertions = new List<SkillPublication.SkillRecord>();
+        request.updates = new List<SkillPublication.SkillRecord>{ update };
+
+        SkillPublication.PublicationResponse response = SkillPublication.post(request);
+
+        System.assertEquals(1, response.records.size());
+        System.assertEquals('UPDATED', response.records[0].status);
+        System.assertEquals(true, response.records[0].success);
+        ServiceResourceSkill changed = [
+            SELECT SkillLevel
+            FROM ServiceResourceSkill
+            WHERE Id = :assignment.Id
+        ];
+        System.assertEquals(3, changed.SkillLevel);
+    }
+
+    @IsTest
+    static void rejectsMalformedIdentityAndBatchOverlap() {
+        Skill skill = new Skill(MasterLabel = 'Batch Skill');
+        insert skill;
+        ServiceResource resource = new ServiceResource(
+            Name = 'Batch Resource',
+            IsActive = true,
+            RelatedRecordId = UserInfo.getUserId()
+        );
+        insert resource;
+
+        SkillPublication.SkillRecord malformed = new SkillPublication.SkillRecord();
+        malformed.rowNumber = 5;
+        malformed.serviceResourceId = 'NOT_AN_ID';
+        malformed.skillId = 'NOT_AN_ID';
+        malformed.skillLevel = 1;
+        malformed.effectiveStartDate = Date.today();
+
+        SkillPublication.SkillRecord first = new SkillPublication.SkillRecord();
+        first.rowNumber = 6;
+        first.serviceResourceId = resource.Id;
+        first.skillId = skill.Id;
+        first.skillLevel = 1;
+        first.effectiveStartDate = Date.today();
+
+        SkillPublication.SkillRecord overlapping = new SkillPublication.SkillRecord();
+        overlapping.rowNumber = 7;
+        overlapping.serviceResourceId = resource.Id;
+        overlapping.skillId = skill.Id;
+        overlapping.skillLevel = 2;
+        overlapping.effectiveStartDate = Date.today();
+
+        SkillPublication.PublicationRequest request = new SkillPublication.PublicationRequest();
+        request.insertions = new List<SkillPublication.SkillRecord>{ malformed, first, overlapping };
+        request.updates = new List<SkillPublication.SkillRecord>();
+
+        SkillPublication.PublicationResponse response = SkillPublication.post(request);
+
+        System.assertEquals(true, findResult(response.records, 5).errors.contains('INVALID_SERVICE_RESOURCE_ID'));
+        System.assertEquals(true, findResult(response.records, 5).errors.contains('INVALID_SKILL_ID'));
+        System.assertEquals(false, findResult(response.records, 6).success);
+        System.assertEquals(false, findResult(response.records, 7).success);
+    }
+
+    @IsTest
     static void rejectsMissingDatesAndLevelsWithoutDml() {
         SkillPublication.SkillRecord record = new SkillPublication.SkillRecord();
         record.rowNumber = 7;
