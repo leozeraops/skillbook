@@ -121,6 +121,8 @@ export function normalizePublication({ selectedRows = [], salesforceRows = [] })
     validRows.push(normalized);
   }
 
+  validRows.sort(compareRows);
+
   const seen = new Map();
   for (const row of validRows) {
     const identity = `${row.serviceResourceId}|${row.skillId}|${row.effectiveStartDate}`;
@@ -144,58 +146,52 @@ export function normalizePublication({ selectedRows = [], salesforceRows = [] })
       const left = validRows[index];
       const right = validRows[otherIndex];
       if (
-        left.operation === "insert"
-        && right.operation === "insert"
-        && left.serviceResourceId === right.serviceResourceId
+        left.serviceResourceId === right.serviceResourceId
         && left.skillId === right.skillId
         && periodsOverlap(left, right)
       ) {
-        addError(
-          errors,
-          right,
-          "VIGENCY_OVERLAP",
-          "Vigencies overlap for the same collaborator and skill.",
-        );
+        addError(errors, right, "VIGENCY_OVERLAP", "Vigencies overlap for the same collaborator and skill.");
       }
     }
   }
 
   const sfIdentityRows = salesforceRows.map((row) => ({
+    id: row.Id || row.id,
     serviceResourceId: row.ServiceResourceId || row.serviceResourceId,
     skillId: row.SkillId || row.skillId,
     effectiveStartDate: normalizeDate(row.EffectiveStartDate || row.effectiveStartDate),
     effectiveEndDate: normalizeDate(row.EffectiveEndDate || row.effectiveEndDate),
   }));
 
-  for (const insertion of insertions) {
-    const exists = sfIdentityRows.some((row) =>
-      row.serviceResourceId === insertion.serviceResourceId
-      && row.skillId === insertion.skillId
-      && row.effectiveStartDate === insertion.effectiveStartDate
-    );
-    if (exists) {
-      addError(errors, insertion, "EXACT_DUPLICATE", "The vigency already exists in Salesforce.");
-    }
-  }
-
-  for (const insertion of insertions) {
-    const overlaps = sfIdentityRows.some((row) =>
-      row.serviceResourceId === insertion.serviceResourceId
-      && row.skillId === insertion.skillId
+  for (const selectedRow of validRows) {
+    const conflictingSalesforceRows = sfIdentityRows.filter((row) =>
+      (selectedRow.operation !== "update" || row.id !== selectedRow.id)
+      && row.serviceResourceId === selectedRow.serviceResourceId
+      && row.skillId === selectedRow.skillId
       && row.effectiveStartDate
-      && row.effectiveStartDate <= (insertion.effectiveEndDate || "9999-12-31")
-      && insertion.effectiveStartDate <= (row.effectiveEndDate || "9999-12-31")
+      && periodsOverlap(selectedRow, row)
     );
-    if (overlaps) {
-      addError(errors, insertion, "VIGENCY_OVERLAP", "The vigency overlaps a Salesforce assignment.");
+
+    if (selectedRow.operation === "insert" && conflictingSalesforceRows.some((row) =>
+      row.effectiveStartDate === selectedRow.effectiveStartDate
+    )) {
+      addError(errors, selectedRow, "EXACT_DUPLICATE", "The vigency already exists in Salesforce.");
+    }
+
+    if (conflictingSalesforceRows.length > 0) {
+      addError(errors, selectedRow, "VIGENCY_OVERLAP", "The vigency overlaps a Salesforce assignment.");
     }
   }
 
-  insertions.sort(compareRows);
-  updates.sort(compareRows);
+  const rejectedRowNumbers = new Set(errors.map((error) => error.rowNumber));
+  const acceptedInsertions = insertions.filter((row) => !rejectedRowNumbers.has(row.rowNumber));
+  const acceptedUpdates = updates.filter((row) => !rejectedRowNumbers.has(row.rowNumber));
+
+  acceptedInsertions.sort(compareRows);
+  acceptedUpdates.sort(compareRows);
   errors.sort((left, right) => (left.rowNumber || 0) - (right.rowNumber || 0));
 
-  return { insertions, updates, errors };
+  return { insertions: acceptedInsertions, updates: acceptedUpdates, errors };
 }
 
 export function summarizePublicationResponse(response) {

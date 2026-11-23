@@ -50,7 +50,15 @@ test("identifica uma atualização pelo ID do registro do Salesforce", () => {
         effectiveEndDate: "2027-01-31",
       },
     ],
-    salesforceRows: [],
+    salesforceRows: [
+      {
+        Id: "SRS-1",
+        ServiceResourceId: "R1",
+        SkillId: "K1",
+        EffectiveStartDate: "2026-12-01",
+        EffectiveEndDate: "2027-12-31",
+      },
+    ],
   });
 
   assert.equal(result.updates.length, 1);
@@ -92,6 +100,7 @@ test("rejeita duplicatas exatas e sobreposições de vigência", () => {
 
   assert.equal(result.errors.some((error) => error.code === "EXACT_DUPLICATE"), true);
   assert.equal(result.errors.some((error) => error.code === "VIGENCY_OVERLAP"), true);
+  assert.deepEqual(result.insertions.map((row) => row.rowNumber), [2]);
 });
 
 test("rejeita datas inválidas e níveis que não são decimais positivos", () => {
@@ -197,4 +206,40 @@ test("rejeita sobreposição contra uma vigência já carregada do Salesforce", 
   });
 
   assert.equal(result.errors.some((error) => error.code === "VIGENCY_OVERLAP"), true);
+  assert.deepEqual(result.insertions, []);
+});
+
+test("rejeita atualização que se sobrepõe a outro registro existente", () => {
+  const result = normalizePublication({
+    selectedRows: [
+      {
+        rowNumber: 16,
+        salesforceId: "SRS-1",
+        serviceResourceId: "R1",
+        skillId: "K1",
+        skillLevel: "2",
+        effectiveStartDate: "2027-02-01",
+        effectiveEndDate: "",
+      },
+    ],
+    salesforceRows: [
+      {
+        Id: "SRS-1",
+        ServiceResourceId: "R1",
+        SkillId: "K1",
+        EffectiveStartDate: "2026-01-01",
+        EffectiveEndDate: "2026-12-31",
+      },
+      {
+        Id: "SRS-2",
+        ServiceResourceId: "R1",
+        SkillId: "K1",
+        EffectiveStartDate: "2027-01-01",
+        EffectiveEndDate: "2027-03-31",
+      },
+    ],
+  });
+
+  assert.equal(result.errors.some((error) => error.code === "VIGENCY_OVERLAP"), true);
+  assert.deepEqual(result.updates, []);
 });
