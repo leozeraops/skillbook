@@ -53,3 +53,30 @@ export function buildMappedSoqlField(column) {
   }
   return apiName;
 }
+
+export function validatePublicationMapping(mapping) {
+  const requiredFields = [
+    "Id",
+    "ServiceResourceId",
+    "SkillId",
+    "SkillLevel",
+    "EffectiveStartDate",
+  ];
+  const values = Object.values(mapping || {});
+  return requiredFields.every((apiName) =>
+    values.some((column) =>
+      column.objectName === "ServiceResourceSkill"
+      && column.apiName === apiName
+    )
+  );
+}
+
+export function findMappedHeader(mapping, objectName, apiName) {
+  for (const header of Object.keys(mapping || {})) {
+    const column = mapping[header];
+    if (column.objectName === objectName && column.apiName === apiName) {
+      return header;
+    }
+  }
+  return null;
+}

@@ -131,6 +131,18 @@ function syncSkills() {
       })),
     ]);
     readLoadedSalesforceRowsCache = rows;
+    const snapshot = rows.map((row) => ({
+      Id: row.Id,
+      ServiceResourceId: row.ServiceResourceId,
+      SkillId: row.SkillId,
+      EffectiveStartDate: row.EffectiveStartDate,
+      EffectiveEndDate: row.EffectiveEndDate,
+    }));
+    CacheService.getUserCache().put(
+      "SALESFORCE_SKILL_ROWS_V1",
+      JSON.stringify(snapshot),
+      21600,
+    );
     return rows;
   } catch (error) {
     SpreadsheetApp.getUi().alert("Falha no Salesforce: " + (error.message || "Falha desconhecida"));
@@ -143,50 +155,26 @@ function readLoadedSalesforceRows() {
   if (readLoadedSalesforceRowsCache) {
     return readLoadedSalesforceRowsCache;
   }
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Matriz de Habilidades");
-  if (!sheet) {
+  const cachedSnapshot = CacheService.getUserCache().get("SALESFORCE_SKILL_ROWS_V1");
+  if (!cachedSnapshot) {
     return [];
   }
-  const values = sheet.getDataRange().getValues();
-  if (values.length < 2) {
-    return [];
-  }
-  const headers = values[0].map((value) => String(value).trim());
-  const index = (name) => headers.indexOf(name);
-  let mapping = {};
   try {
-    mapping = getFieldMapping();
+    return JSON.parse(cachedSnapshot);
   } catch (error) {
-    mapping = {};
+    return [];
   }
-  const headerForApiName = (apiName) => {
-    for (const header of Object.keys(mapping)) {
-      if (mapping[header].apiName === apiName) return header;
-    }
-    return null;
-  };
-  const idHeader = headerForApiName("Id");
-  const resourceHeader = headerForApiName("ServiceResourceId");
-  const skillHeader = headerForApiName("SkillId");
-  const levelHeader = headerForApiName("SkillLevel");
-  const startHeader = headerForApiName("EffectiveStartDate");
-  const endHeader = headerForApiName("EffectiveEndDate");
-  return values.slice(1).map((row) => ({
-    Id: idHeader ? row[index(idHeader)] : "",
-    ServiceResourceId: resourceHeader ? row[index(resourceHeader)] : "",
-    SkillId: skillHeader ? row[index(skillHeader)] : "",
-    SkillLevel: levelHeader ? row[index(levelHeader)] : "",
-    EffectiveStartDate: startHeader ? row[index(startHeader)] : "",
-    EffectiveEndDate: endHeader ? row[index(endHeader)] : "",
-  }));
 }
 
 function postPublication(preview) {
-  return salesforceFetch("/services/apexrest/SkillPublication", {
+  const response = salesforceFetch("/services/apexrest/SkillPublication", {
     method: "post",
     payload: {
       insertions: preview.insertions,
       updates: preview.updates,
     },
   });
+  readLoadedSalesforceRowsCache = null;
+  CacheService.getUserCache().remove("SALESFORCE_SKILL_ROWS_V1");
+  return response;
 }

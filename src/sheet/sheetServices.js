@@ -74,7 +74,9 @@ function writePublicationAudit(preview, response) {
   }
   const records = response && response.records ? response.records : [];
   const successes = records.filter((record) => record.success).length;
-  const failures = records.filter((record) => !record.success).length;
+  const salesforceFailures = records.filter((record) => !record.success).length;
+  const previewFailures = preview.errors ? preview.errors.length : 0;
+  const failures = previewFailures + salesforceFailures;
   sheet.appendRow([
     new Date(),
     Session.getActiveUser().getEmail(),
@@ -85,6 +87,10 @@ function writePublicationAudit(preview, response) {
     JSON.stringify({
       insertions: preview.insertions.map((row) => row.rowId),
       updates: preview.updates.map((row) => row.rowId),
+      previewErrors: (preview.errors || []).map((error) => ({
+        rowNumber: error.rowNumber,
+        code: error.code,
+      })),
     }),
   ]);
 }

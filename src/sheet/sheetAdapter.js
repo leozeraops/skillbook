@@ -10,7 +10,10 @@ function readSelectedRows(ranges) {
   }
   const headerForApiName = (apiName) => {
     for (const header of Object.keys(mapping)) {
-      if (mapping[header].apiName === apiName) return header;
+      if (
+        mapping[header].objectName === "ServiceResourceSkill"
+        && mapping[header].apiName === apiName
+      ) return header;
     }
     return null;
   };
@@ -55,15 +58,19 @@ function buildPublicationPreview(ranges) {
   let mappingValid = true;
   try {
     const mapping = getFieldMapping();
-    const requiredApiNames = [
-      "ServiceResourceId",
+    const requiredFields = [
       "Id",
+      "ServiceResourceId",
       "SkillId",
       "SkillLevel",
       "EffectiveStartDate",
     ];
-    const mappedApiNames = Object.keys(mapping).map((header) => mapping[header].apiName);
-    mappingValid = requiredApiNames.every((apiName) => mappedApiNames.includes(apiName));
+    mappingValid = requiredFields.every((apiName) =>
+      Object.values(mapping).some((column) =>
+        column.objectName === "ServiceResourceSkill"
+        && column.apiName === apiName
+      )
+    );
   } catch (error) {
     mappingValid = false;
   }
@@ -74,7 +81,22 @@ function buildPublicationPreview(ranges) {
 
 function formatPublicationResult(response) {
   const records = response && response.records ? response.records : [];
-  const successes = records.filter((record) => record.success).length;
-  const failures = records.length - successes;
-  return `Publicação concluída\nSucessos: ${successes}\nFalhas: ${failures}`;
+  const successes = records.filter((record) => record.success);
+  const failures = records.filter((record) => !record.success);
+  const lines = [
+    "Publicação concluída",
+    `Sucessos: ${successes.length}`,
+    `Falhas: ${failures.length}`,
+  ];
+
+  successes.forEach((record) => {
+    lines.push(`Linha ${record.rowNumber}: sucesso (${record.id || "sem ID"})`);
+  });
+  failures.forEach((record) => {
+    const errors = record.errors && record.errors.length > 0
+      ? record.errors.join(", ")
+      : "ERRO_DESCONHECIDO";
+    lines.push(`Linha ${record.rowNumber}: falha (${errors})`);
+  });
+  return lines.join("\n");
 }

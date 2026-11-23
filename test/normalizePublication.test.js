@@ -2,9 +2,56 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  formatPublicationPreview,
+  formatPublicationResult,
   normalizePublication,
   summarizePublicationResponse,
 } from "../src/publication/normalizePublication.js";
+
+test("formata a prévia com contagens e detalhes por linha", () => {
+  const message = formatPublicationPreview({
+    insertions: [{
+      rowNumber: 5,
+      rowId: "R1|K1|2026-12-01",
+      operation: "insert",
+    }],
+    updates: [{
+      rowNumber: 9,
+      rowId: "SRS-1",
+      operation: "update",
+    }],
+    errors: [{
+      rowNumber: 7,
+      rowId: "SRS-2",
+      code: "VIGENCY_OVERLAP",
+      message: "A vigência se sobrepõe a uma atribuição existente.",
+    }],
+  });
+
+  assert.match(message, /Prévia da publicação/);
+  assert.match(message, /Inserções: 1/);
+  assert.match(message, /Linha 5: R1\|K1\|2026-12-01/);
+  assert.match(message, /Atualizações: 1/);
+  assert.match(message, /Linha 9: SRS-1/);
+  assert.match(message, /Erros: 1/);
+  assert.match(message, /Linha 7 \(VIGENCY_OVERLAP\): SRS-2/);
+  assert.match(message, /A vigência se sobrepõe a uma atribuição existente/);
+});
+
+test("formata sucessos e falhas individuais após uma publicação parcial", () => {
+  const message = formatPublicationResult({
+    records: [
+      { rowNumber: 3, success: true, id: "SRS-3", status: "UPDATED" },
+      { rowNumber: 4, success: false, id: null, errors: ["VALIDATION_ERROR"] },
+    ],
+  });
+
+  assert.match(message, /Publicação concluída/);
+  assert.match(message, /Sucessos: 1/);
+  assert.match(message, /Falhas: 1/);
+  assert.match(message, /Linha 3: sucesso \(SRS-3\)/);
+  assert.match(message, /Linha 4: falha \(VALIDATION_ERROR\)/);
+});
 
 test("normaliza uma inserção nova usando colaborador, habilidade e data de início", () => {
   const result = normalizePublication({

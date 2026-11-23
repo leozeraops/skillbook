@@ -201,3 +201,26 @@ function normalizePublicationForAppsScript(selectedRows, salesforceRows) {
   errors.sort(compareRows);
   return { insertions: acceptedInsertions, updates: acceptedUpdates, errors };
 }
+
+function formatPublicationPreview(preview) {
+  const insertions = preview && preview.insertions ? preview.insertions : [];
+  const updates = preview && preview.updates ? preview.updates : [];
+  const errors = preview && preview.errors ? preview.errors : [];
+  const lines = [
+    "Prévia da publicação",
+    `Inserções: ${insertions.length}`,
+  ];
+
+  for (const row of insertions) {
+    lines.push(`Linha ${row.rowNumber}: ${row.rowId}`);
+  }
+  lines.push(`Atualizações: ${updates.length}`);
+  for (const row of updates) {
+    lines.push(`Linha ${row.rowNumber}: ${row.rowId}`);
+  }
+  lines.push(`Erros: ${errors.length}`);
+  for (const error of errors) {
+    lines.push(`Linha ${error.rowNumber} (${error.code}): ${error.rowId} - ${error.message}`);
+  }
+  return lines.join("\n");
+}

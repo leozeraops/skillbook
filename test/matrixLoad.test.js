@@ -6,7 +6,36 @@ import {
   parseFieldMapping,
   buildRefreshPlan,
   buildMappedSoqlField,
+  findMappedHeader,
+  validatePublicationMapping,
 } from "../src/sheet/matrixLoad.js";
+
+test("resolve campos publicados pelo objeto Salesforce correto", () => {
+  const mapping = {
+    IdentificadorSkill: { objectName: "Skill", apiName: "Id" },
+    IdentificadorAtribuicao: { objectName: "ServiceResourceSkill", apiName: "Id" },
+  };
+
+  assert.equal(
+    findMappedHeader(mapping, "ServiceResourceSkill", "Id"),
+    "IdentificadorAtribuicao",
+  );
+});
+
+test("valida objeto e campo obrigatórios do mapeamento de publicação", () => {
+  assert.equal(validatePublicationMapping({
+    Identificador: { objectName: "ServiceResourceSkill", apiName: "Id" },
+    Colaborador: { objectName: "ServiceResourceSkill", apiName: "ServiceResourceId" },
+    Habilidade: { objectName: "ServiceResourceSkill", apiName: "SkillId" },
+    Nivel: { objectName: "ServiceResourceSkill", apiName: "SkillLevel" },
+    Inicio: { objectName: "ServiceResourceSkill", apiName: "EffectiveStartDate" },
+  }), true);
+
+  assert.equal(validatePublicationMapping({
+    Identificador: { objectName: "Skill", apiName: "Id" },
+    Colaborador: { objectName: "ServiceResourceSkill", apiName: "ServiceResourceId" },
+  }), false);
+});
 
 test("concatena páginas SOQL sem perder registros", () => {
   const records = mergePaginatedRecords([

@@ -242,3 +242,50 @@ export function summarizePublicationResponse(response) {
     failedRows,
   };
 }
+
+export function formatPublicationPreview(preview) {
+  const insertions = preview?.insertions || [];
+  const updates = preview?.updates || [];
+  const errors = preview?.errors || [];
+  const lines = [
+    "Prévia da publicação",
+    `Inserções: ${insertions.length}`,
+  ];
+
+  insertions.forEach((row) => {
+    lines.push(`Linha ${row.rowNumber}: ${row.rowId}`);
+  });
+  lines.push(`Atualizações: ${updates.length}`);
+  updates.forEach((row) => {
+    lines.push(`Linha ${row.rowNumber}: ${row.rowId}`);
+  });
+  lines.push(`Erros: ${errors.length}`);
+  errors.forEach((error) => {
+    lines.push(`Linha ${error.rowNumber} (${error.code}): ${error.rowId} - ${error.message}`);
+  });
+
+  return lines.join("\n");
+}
+
+export function formatPublicationResult(response) {
+  const records = response?.records || [];
+  const successes = records.filter((record) => record.success);
+  const failures = records.filter((record) => !record.success);
+  const lines = [
+    "Publicação concluída",
+    `Sucessos: ${successes.length}`,
+    `Falhas: ${failures.length}`,
+  ];
+
+  successes.forEach((record) => {
+    lines.push(`Linha ${record.rowNumber}: sucesso (${record.id || "sem ID"})`);
+  });
+  failures.forEach((record) => {
+    const errors = record.errors && record.errors.length > 0
+      ? record.errors.join(", ")
+      : "ERRO_DESCONHECIDO";
+    lines.push(`Linha ${record.rowNumber}: falha (${errors})`);
+  });
+
+  return lines.join("\n");
+}

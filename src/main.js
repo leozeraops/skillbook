@@ -27,14 +27,17 @@ function previewPublication() {
     }
 
     const result = buildPublicationPreview(ranges);
-    const message = [
-      `Inserções: ${result.insertions.length}`,
-      `Atualizações: ${result.updates.length}`,
-      `Erros: ${result.errors.length}`,
-    ].join("\n");
-    SpreadsheetApp.getUi().alert(message);
+    SpreadsheetApp.getUi().alert(formatPublicationPreview(result));
     return result;
   } catch (error) {
+    writePublicationAudit(preview, {
+      records: [{
+        rowNumber: 0,
+        success: false,
+        id: null,
+        errors: ["REQUEST_ERROR"],
+      }],
+    });
     SpreadsheetApp.getUi().alert("Falha no Salesforce: " + (error.message || "Falha desconhecida"));
     return null;
   }
@@ -47,6 +50,10 @@ function publishSelectedRows() {
   }
   if (!preview.mappingValid) {
     SpreadsheetApp.getUi().alert("A publicação foi interrompida: mapeamento obrigatório ausente ou inválido.");
+    return null;
+  }
+  if (preview.insertions.length + preview.updates.length === 0) {
+    SpreadsheetApp.getUi().alert("Não há linhas válidas selecionadas para publicação.");
     return null;
   }
 
