@@ -29,7 +29,16 @@ function isPositiveDecimal(value) {
     return false;
   }
 
-  const number = Number(value);
+  if (typeof value !== "number" && typeof value !== "string") {
+    return false;
+  }
+
+  const text = String(value).trim();
+  if (typeof value === "string" && !/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
+    return false;
+  }
+
+  const number = Number(text);
   return Number.isFinite(number) && number > 0;
 }
 
@@ -124,7 +133,17 @@ export function normalizePublication({ selectedRows = [], salesforceRows = [] })
   validRows.sort(compareRows);
 
   const seen = new Map();
+  const seenSalesforceIds = new Set();
   for (const row of validRows) {
+    if (row.operation === "update") {
+      if (seenSalesforceIds.has(row.id)) {
+        addError(errors, row, "EXACT_DUPLICATE", "The Salesforce record is selected more than once.");
+      } else {
+        seenSalesforceIds.add(row.id);
+      }
+      continue;
+    }
+
     const identity = `${row.serviceResourceId}|${row.skillId}|${row.effectiveStartDate}`;
     if (!seen.has(identity)) {
       seen.set(identity, row);
@@ -145,6 +164,9 @@ export function normalizePublication({ selectedRows = [], salesforceRows = [] })
     for (let otherIndex = index + 1; otherIndex < validRows.length; otherIndex += 1) {
       const left = validRows[index];
       const right = validRows[otherIndex];
+      if (left.operation === "update" && left.id === right.id) {
+        continue;
+      }
       if (
         left.serviceResourceId === right.serviceResourceId
         && left.skillId === right.skillId

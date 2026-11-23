@@ -67,6 +67,37 @@ test("identifica uma atualização pelo ID do registro do Salesforce", () => {
   assert.equal(result.updates[0].operation, "update");
 });
 
+test("rejeita linhas selecionadas mais de uma vez pelo mesmo ID do Salesforce", () => {
+  const result = normalizePublication({
+    selectedRows: [
+      {
+        rowNumber: 10,
+        salesforceId: "SRS-1",
+        serviceResourceId: "R1",
+        skillId: "K1",
+        skillLevel: "2",
+        effectiveStartDate: "2026-12-01",
+        effectiveEndDate: "2027-01-31",
+      },
+      {
+        rowNumber: 11,
+        salesforceId: "SRS-1",
+        serviceResourceId: "R1",
+        skillId: "K1",
+        skillLevel: "3",
+        effectiveStartDate: "2026-12-01",
+        effectiveEndDate: "2027-01-31",
+      },
+    ],
+    salesforceRows: [],
+  });
+
+  assert.equal(result.errors.some((error) =>
+    error.rowNumber === 11 && error.code === "EXACT_DUPLICATE"
+  ), true);
+  assert.deepEqual(result.updates.map((row) => row.rowNumber), [10]);
+});
+
 test("rejeita duplicatas exatas e sobreposições de vigência", () => {
   const result = normalizePublication({
     selectedRows: [
@@ -122,6 +153,22 @@ test("rejeita datas inválidas e níveis que não são decimais positivos", () =
         effectiveStartDate: "2026-12-01",
         effectiveEndDate: "2026-11-01",
       },
+      {
+        rowNumber: 9,
+        serviceResourceId: "R1",
+        skillId: "K1",
+        skillLevel: "0x10",
+        effectiveStartDate: "2026-12-01",
+        effectiveEndDate: "",
+      },
+      {
+        rowNumber: 10,
+        serviceResourceId: "R1",
+        skillId: "K1",
+        skillLevel: "1e3",
+        effectiveStartDate: "2026-12-01",
+        effectiveEndDate: "",
+      },
     ],
     salesforceRows: [],
   });
@@ -129,6 +176,8 @@ test("rejeita datas inválidas e níveis que não são decimais positivos", () =
   assert.equal(result.errors.some((error) => error.code === "START_DATE_REQUIRED"), true);
   assert.equal(result.errors.some((error) => error.code === "INVALID_SKILL_LEVEL"), true);
   assert.equal(result.errors.some((error) => error.code === "END_DATE_BEFORE_START"), true);
+  assert.equal(result.errors.some((error) => error.rowNumber === 9 && error.code === "INVALID_SKILL_LEVEL"), true);
+  assert.equal(result.errors.some((error) => error.rowNumber === 10 && error.code === "INVALID_SKILL_LEVEL"), true);
 });
 
 test("não produz operação de exclusão e mantém os resultados determinísticos", () => {

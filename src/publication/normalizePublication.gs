@@ -48,6 +48,23 @@ function normalizePublicationForAppsScript(selectedRows, salesforceRows) {
     return left.effectiveStartDate <= rightEnd && right.effectiveStartDate <= leftEnd;
   }
 
+  function isPositiveDecimal(value) {
+    if (value === null || value === undefined || String(value).trim() === "") {
+      return false;
+    }
+    if (typeof value !== "number" && typeof value !== "string") {
+      return false;
+    }
+
+    const text = String(value).trim();
+    if (typeof value === "string" && !/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(text)) {
+      return false;
+    }
+
+    const number = Number(text);
+    return Number.isFinite(number) && number > 0;
+  }
+
   const validRows = [];
   for (const row of selectedRows || []) {
     const startDate = dateOnly(row.effectiveStartDate);
@@ -70,8 +87,7 @@ function normalizePublicationForAppsScript(selectedRows, salesforceRows) {
       valid = false;
     }
     const level = Number(row.skillLevel);
-    if (row.skillLevel === null || row.skillLevel === undefined || String(row.skillLevel).trim() === ""
-      || !Number.isFinite(level) || level <= 0) {
+    if (!isPositiveDecimal(row.skillLevel)) {
       addError(row, "INVALID_SKILL_LEVEL", "SkillLevel must be a decimal greater than zero.");
       valid = false;
     }
@@ -105,7 +121,17 @@ function normalizePublicationForAppsScript(selectedRows, salesforceRows) {
   validRows.sort(compareRows);
 
   const seen = new Map();
+  const seenSalesforceIds = new Set();
   for (const row of validRows) {
+    if (row.operation === "update") {
+      if (seenSalesforceIds.has(row.id)) {
+        addError(row, "EXACT_DUPLICATE", "The Salesforce record is selected more than once.");
+      } else {
+        seenSalesforceIds.add(row.id);
+      }
+      continue;
+    }
+
     const identity = `${row.serviceResourceId}|${row.skillId}|${row.effectiveStartDate}`;
     if (!seen.has(identity)) {
       seen.set(identity, row);
@@ -126,6 +152,9 @@ function normalizePublicationForAppsScript(selectedRows, salesforceRows) {
     for (let otherIndex = index + 1; otherIndex < validRows.length; otherIndex += 1) {
       const left = validRows[index];
       const right = validRows[otherIndex];
+      if (left.operation === "update" && left.id === right.id) {
+        continue;
+      }
       if (
         left.serviceResourceId === right.serviceResourceId
         && left.skillId === right.skillId
