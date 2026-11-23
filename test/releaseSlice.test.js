@@ -67,7 +67,7 @@ test("demonstrates a production partial-publication release slice", () => {
   assert.equal(audit.environment, "production");
   assert.equal(audit.selectedCount, 2);
   assert.equal(audit.successCount, 1);
-  assert.equal(audit.failureCount, 3);
+  assert.equal(audit.failureCount, 1);
 });
 
 test("requires an explicit sandbox environment selection", () => {

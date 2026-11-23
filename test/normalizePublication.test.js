@@ -48,6 +48,32 @@ test("gera uma linha de auditoria com contagens e resumo reduzido", () => {
   });
 });
 
+test("conta uma linha falhada uma única vez na auditoria", () => {
+  const row = buildPublicationAuditRow({
+    timestamp: "2026-11-23T01:46:49Z",
+    user: "operador@example.com",
+    environment: "production",
+    preview: {
+      selectedRowCount: 2,
+      insertions: [{ rowId: "R1|K1|2026-12-01" }],
+      updates: [],
+      errors: [
+        { rowNumber: 3, code: "INVALID_SKILL_LEVEL" },
+        { rowNumber: 3, code: "START_DATE_REQUIRED" },
+      ],
+    },
+    response: {
+      records: [
+        { rowNumber: 2, success: true },
+        { rowNumber: 3, success: false, errors: ["VALIDATION_ERROR"] },
+      ],
+    },
+  });
+
+  assert.equal(row.successCount, 1);
+  assert.equal(row.failureCount, 1);
+});
+
 test("formata a prévia com contagens e detalhes por linha", () => {
   const message = formatPublicationPreview({
     insertions: [{

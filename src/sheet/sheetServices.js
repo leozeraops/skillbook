@@ -120,9 +120,16 @@ function writePublicationAudit(preview, response) {
   }
   const records = response && response.records ? response.records : [];
   const successes = records.filter((record) => record.success).length;
-  const salesforceFailures = records.filter((record) => !record.success).length;
-  const previewFailures = preview && preview.errors ? preview.errors.length : 0;
-  const failures = previewFailures + salesforceFailures;
+  const failedRowNumbers = new Set();
+  if (preview && preview.errors) {
+    preview.errors.forEach((error) => failedRowNumbers.add(error.rowNumber));
+  }
+  records.forEach((record) => {
+    if (!record.success) {
+      failedRowNumbers.add(record.rowNumber);
+    }
+  });
+  const failures = failedRowNumbers.size;
   const previewOrEmpty = preview || {};
   sheet.appendRow([
     new Date(),

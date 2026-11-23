@@ -252,10 +252,17 @@ export function buildPublicationAuditRow({
 }) {
   const records = response.records || [];
   const successCount = records.filter((record) => record.success).length;
-  const salesforceFailureCount = records.filter((record) => !record.success).length;
-  const previewFailureCount = (preview.errors || []).length;
   const selectedCount = preview.selectedRowCount
     || (preview.insertions || []).length + (preview.updates || []).length;
+  const failedRowNumbers = new Set();
+  for (const error of preview.errors || []) {
+    failedRowNumbers.add(error.rowNumber);
+  }
+  for (const record of records) {
+    if (!record.success) {
+      failedRowNumbers.add(record.rowNumber);
+    }
+  }
 
   return {
     timestamp,
@@ -263,7 +270,7 @@ export function buildPublicationAuditRow({
     environment,
     selectedCount,
     successCount,
-    failureCount: previewFailureCount + salesforceFailureCount,
+    failureCount: failedRowNumbers.size,
     summary: {
       insertions: (preview.insertions || []).map((row) => row.rowId),
       updates: (preview.updates || []).map((row) => row.rowId),
