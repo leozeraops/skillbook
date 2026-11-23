@@ -43,6 +43,52 @@ function replaceDataRange(sheetName, values) {
   if (!sheet.getFilter()) {
     sheet.createFilter();
   }
+  applyVigencyHighlight(sheetName);
+}
+
+function applyVigencyHighlight(sheetName) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet) return;
+
+  let mapping = {};
+  try {
+    mapping = getFieldMapping();
+  } catch (error) {
+    return;
+  }
+
+  let endDateHeader = null;
+  for (const header of Object.keys(mapping)) {
+    const column = mapping[header];
+    if (column.objectName === "ServiceResourceSkill" && column.apiName === "EffectiveEndDate") {
+      endDateHeader = header;
+      break;
+    }
+  }
+  if (!endDateHeader) return;
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const headerIndex = headers.findIndex((header) =>
+    String(header).trim() === String(endDateHeader).trim()
+  );
+  if (headerIndex < 0) return;
+
+  const range = sheet.getRange(2, headerIndex + 1, Math.max(sheet.getMaxRows() - 1, 1), 1);
+  const columnLetter = range.getA1Notation()
+    .split(":")[0]
+    .replace(/[0-9]/g, "");
+  const expiredRule = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=AND(${columnLetter}2<>"" , ${columnLetter}2<TODAY())`)
+    .setBackground("#F4CCCC")
+    .setRanges([range])
+    .build();
+  const expiringRule = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(`=AND(${columnLetter}2>=TODAY(),${columnLetter}2<=TODAY()+30)`)
+    .setBackground("#FFF2CC")
+    .setRanges([range])
+    .build();
+  sheet.setConditionalFormatRules([expiredRule, expiringRule]);
 }
 
 function getFieldMapping() {
@@ -75,19 +121,21 @@ function writePublicationAudit(preview, response) {
   const records = response && response.records ? response.records : [];
   const successes = records.filter((record) => record.success).length;
   const salesforceFailures = records.filter((record) => !record.success).length;
-  const previewFailures = preview.errors ? preview.errors.length : 0;
+  const previewFailures = preview && preview.errors ? preview.errors.length : 0;
   const failures = previewFailures + salesforceFailures;
+  const previewOrEmpty = preview || {};
   sheet.appendRow([
     new Date(),
     Session.getActiveUser().getEmail(),
     getSalesforceEnvironment(),
-    preview.selectedRowCount || preview.insertions.length + preview.updates.length,
+    previewOrEmpty.selectedRowCount
+      || (previewOrEmpty.insertions || []).length + (previewOrEmpty.updates || []).length,
     successes,
     failures,
     JSON.stringify({
-      insertions: preview.insertions.map((row) => row.rowId),
-      updates: preview.updates.map((row) => row.rowId),
-      previewErrors: (preview.errors || []).map((error) => ({
+      insertions: (previewOrEmpty.insertions || []).map((row) => row.rowId),
+      updates: (previewOrEmpty.updates || []).map((row) => row.rowId),
+      previewErrors: (previewOrEmpty.errors || []).map((error) => ({
         rowNumber: error.rowNumber,
         code: error.code,
       })),

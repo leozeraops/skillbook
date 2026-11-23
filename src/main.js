@@ -30,14 +30,6 @@ function previewPublication() {
     SpreadsheetApp.getUi().alert(formatPublicationPreview(result));
     return result;
   } catch (error) {
-    writePublicationAudit(preview, {
-      records: [{
-        rowNumber: 0,
-        success: false,
-        id: null,
-        errors: ["REQUEST_ERROR"],
-      }],
-    });
     SpreadsheetApp.getUi().alert("Falha no Salesforce: " + (error.message || "Falha desconhecida"));
     return null;
   }
@@ -72,6 +64,16 @@ function publishSelectedRows() {
     SpreadsheetApp.getUi().alert(formatPublicationResult(response));
     return response;
   } catch (error) {
+    if (preview) {
+      writePublicationAudit(preview, {
+        records: [{
+          rowNumber: 0,
+          success: false,
+          id: null,
+          errors: ["REQUEST_ERROR"],
+        }],
+      });
+    }
     SpreadsheetApp.getUi().alert("Falha no Salesforce: " + (error.message || "Falha desconhecida"));
     return null;
   }

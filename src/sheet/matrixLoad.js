@@ -80,3 +80,36 @@ export function findMappedHeader(mapping, objectName, apiName) {
   }
   return null;
 }
+
+export function buildSheetColumnLetter(index) {
+  let number = Number(index);
+  if (!Number.isInteger(number) || number < 0) return "";
+  let letter = "";
+  number += 1;
+  while (number > 0) {
+    const remainder = (number - 1) % 26;
+    letter = String.fromCharCode(65 + remainder) + letter;
+    number = Math.floor((number - 1) / 26);
+  }
+  return letter;
+}
+
+export function classifyVigencyState(endDate, referenceDate = new Date(), warningDays = 30) {
+  const referenceText = typeof referenceDate === "string"
+    ? referenceDate
+    : referenceDate.toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(referenceText)) return "unknown";
+  const reference = new Date(`${referenceText}T00:00:00Z`);
+  if (Number.isNaN(reference.getTime())) return "unknown";
+
+  if (!endDate) return "active";
+  const endText = String(endDate).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endText)) return "unknown";
+
+  const end = new Date(`${endText}T00:00:00Z`);
+  if (Number.isNaN(end.getTime())) return "unknown";
+
+  if (end < reference) return "expired";
+  const warningLimit = reference.getTime() + Number(warningDays) * 24 * 60 * 60 * 1000;
+  return end.getTime() <= warningLimit ? "expiring" : "active";
+}

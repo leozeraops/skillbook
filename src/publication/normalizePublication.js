@@ -243,6 +243,38 @@ export function summarizePublicationResponse(response) {
   };
 }
 
+export function buildPublicationAuditRow({
+  timestamp,
+  user,
+  environment,
+  preview = {},
+  response = {},
+}) {
+  const records = response.records || [];
+  const successCount = records.filter((record) => record.success).length;
+  const salesforceFailureCount = records.filter((record) => !record.success).length;
+  const previewFailureCount = (preview.errors || []).length;
+  const selectedCount = preview.selectedRowCount
+    || (preview.insertions || []).length + (preview.updates || []).length;
+
+  return {
+    timestamp,
+    user,
+    environment,
+    selectedCount,
+    successCount,
+    failureCount: previewFailureCount + salesforceFailureCount,
+    summary: {
+      insertions: (preview.insertions || []).map((row) => row.rowId),
+      updates: (preview.updates || []).map((row) => row.rowId),
+      previewErrors: (preview.errors || []).map((error) => ({
+        rowNumber: error.rowNumber,
+        code: error.code,
+      })),
+    },
+  };
+}
+
 export function formatPublicationPreview(preview) {
   const insertions = preview?.insertions || [];
   const updates = preview?.updates || [];

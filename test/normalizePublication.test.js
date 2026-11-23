@@ -6,7 +6,47 @@ import {
   formatPublicationResult,
   normalizePublication,
   summarizePublicationResponse,
+  buildPublicationAuditRow,
 } from "../src/publication/normalizePublication.js";
+
+test("gera uma linha de auditoria com contagens e resumo reduzido", () => {
+  const row = buildPublicationAuditRow({
+    timestamp: "2026-11-23T01:46:49Z",
+    user: "operador@example.com",
+    environment: "production",
+    preview: {
+      selectedRowCount: 3,
+      insertions: [{ rowId: "R1|K1|2026-12-01" }],
+      updates: [{ rowId: "SRS-2" }],
+      errors: [{
+        rowNumber: 8,
+        rowId: "R9|K9|2026-12-15",
+        code: "INVALID_SKILL_LEVEL",
+      }],
+    },
+    response: {
+      records: [
+        { rowNumber: 2, success: true },
+        { rowNumber: 3, success: false, errors: ["VALIDATION_ERROR"] },
+      ],
+    },
+  });
+
+  assert.equal(row.timestamp, "2026-11-23T01:46:49Z");
+  assert.equal(row.user, "operador@example.com");
+  assert.equal(row.environment, "production");
+  assert.equal(row.selectedCount, 3);
+  assert.equal(row.successCount, 1);
+  assert.equal(row.failureCount, 2);
+  assert.deepEqual(row.summary, {
+    insertions: ["R1|K1|2026-12-01"],
+    updates: ["SRS-2"],
+    previewErrors: [{
+      rowNumber: 8,
+      code: "INVALID_SKILL_LEVEL",
+    }],
+  });
+});
 
 test("formata a prévia com contagens e detalhes por linha", () => {
   const message = formatPublicationPreview({

@@ -8,7 +8,23 @@ import {
   buildMappedSoqlField,
   findMappedHeader,
   validatePublicationMapping,
+  classifyVigencyState,
+  buildSheetColumnLetter,
 } from "../src/sheet/matrixLoad.js";
+
+test("gera letras de coluna configuráveis além da coluna Z", () => {
+  assert.equal(buildSheetColumnLetter(0), "A");
+  assert.equal(buildSheetColumnLetter(25), "Z");
+  assert.equal(buildSheetColumnLetter(26), "AA");
+  assert.equal(buildSheetColumnLetter(27), "AB");
+});
+
+test("classifica vigências vencidas, próximas do vencimento e vigentes", () => {
+  assert.equal(classifyVigencyState("2026-11-22", "2026-11-23", 30), "expired");
+  assert.equal(classifyVigencyState("2026-12-10", "2026-11-23", 30), "expiring");
+  assert.equal(classifyVigencyState("2027-01-31", "2026-11-23", 30), "active");
+  assert.equal(classifyVigencyState("", "invalid", 30), "unknown");
+});
 
 test("resolve campos publicados pelo objeto Salesforce correto", () => {
   const mapping = {
